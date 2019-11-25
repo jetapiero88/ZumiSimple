@@ -77,38 +77,38 @@ def build(width, height, depth, classes):
 
 def load_images(dataset_directory):
     
-    data_path_train = os.getcwd() +'/'+ dataset_directory + '/' + 'train'
+	data_path_train = os.getcwd() +'/'+ dataset_directory + '/' + 'train'
 
-    data_dir_train = pathlib.Path(data_path_train)
+	data_dir_train = pathlib.Path(data_path_train)
 
-    train_images = list(data_dir_train.glob('*/*'))
-    train_images = [str(path) for path in train_images]
-    random.shuffle(train_images)
+	train_images = list(data_dir_train.glob('*/*'))
+	train_images = [str(path) for path in train_images]
+	random.shuffle(train_images)
  
     #label_names = np.array([item.name for item in data_dir_train.glob('*')])
-    label_names = [item.name for item in data_dir_train.glob('*') if item.name != '.ipynb_checkpoints']
+	label_names = [item.name for item in data_dir_train.glob('*') if item.name != '.ipynb_checkpoints']
 
-    label_dict = {name: i for (i,name) in enumerate(label_names)}
+	label_dict = {name: i for (i,name) in enumerate(label_names)}
 
-    train_labels=[label_dict[pathlib.Path(path).parent.name] for path in train_images]
+	train_labels=[label_dict[pathlib.Path(path).parent.name] for path in train_images]
  
-    data_size=len(train_images)
+	data_size=len(train_images)
 
     ### Testing data
 
-    data_path_test = os.getcwd() +'/'+ dataset_directory + '/' + 'test'
+	data_path_test = os.getcwd() +'/'+ dataset_directory + '/' + 'test'
 
-    data_dir_test = pathlib.Path(data_path_test)
+	data_dir_test = pathlib.Path(data_path_test)
 
-    test_images = list(data_dir_test.glob('*/*'))
-    test_images = [str(path) for path in test_images]
-    random.shuffle(test_images)
+	test_images = list(data_dir_test.glob('*/*'))
+	test_images = [str(path) for path in test_images]
+	random.shuffle(test_images)
 
-    test_labels=[label_dict[pathlib.Path(path).parent.name] for path in test_images]
+	test_labels=[label_dict[pathlib.Path(path).parent.name] for path in test_images]
  
-    test_data_size=len(test_images)
+	test_data_size=len(test_images)
     
-    return train_images, train_labels, test_images, test_labels
+	return train_images, train_labels, test_images, test_labels, label_names
 
 def load_split(x, y, IMG_SIZE):
 	# initialize the list of data and labels
@@ -148,41 +148,41 @@ def train_and_upload_model(dataset_name_zip, model_name):
 	downloaded = download_dataset_from_cloud(dataset_name_zip, dataset_directory)
 
 	if downloaded:
-		train_images, train_labels, test_images, test_labels = load_images(dataset_directory)
-    else:
-        return print('There was a problem downloading the dataset, make sure you input the right name')
+		train_images, train_labels, test_images, test_labels, label_names = load_images(dataset_directory)
+	else:
+		return print('There was a problem downloading the dataset, make sure you input the right name')
     
-    IMG_SIZE=32
+	IMG_SIZE=32
 
-    (x_train, y_train) = load_split(train_images, train_labels, IMG_SIZE)
-    (x_test, y_test) = load_split(test_images, test_labels, IMG_SIZE)
+	(x_train, y_train) = load_split(train_images, train_labels, IMG_SIZE)
+	(x_test, y_test) = load_split(test_images, test_labels, IMG_SIZE)
 
     # scale data to the range of [0, 1]
-    x_train = x_train.astype("float32") / 255.0
-    x_test = x_test.astype("float32") / 255.0
+	x_train = x_train.astype("float32") / 255.0
+	x_test = x_test.astype("float32") / 255.0
  
     # one-hot encode the training and testing labels
-    numLabels  = len(label_names)
-    y_train = to_categorical(y_train, numLabels)
-    y_test = to_categorical(y_test, numLabels)
+	numLabels  = len(label_names)
+	y_train = to_categorical(y_train, numLabels)
+	y_test = to_categorical(y_test, numLabels)
  
     # account for skew in the labeled data
-    classTotals = y_train.sum(axis=0)
-    classWeight = classTotals.max() / classTotals
+	classTotals = y_train.sum(axis=0)
+	classWeight = classTotals.max() / classTotals
 
-    model = build(width=32, height=32, depth=3,
+	model = build(width=32, height=32, depth=3,
         classes=numLabels)
 
-    NUM_EPOCHS = 20
-    INIT_LR = 1e-3
-    BS = 10
+	NUM_EPOCHS = 20
+	INIT_LR = 1e-3
+	BS = 10
 
-    opt = Adam(lr=INIT_LR, decay=INIT_LR / (NUM_EPOCHS * 0.5))
+	opt = Adam(lr=INIT_LR, decay=INIT_LR / (NUM_EPOCHS * 0.5))
 
-    model.compile(loss="categorical_crossentropy", optimizer=opt,
+	model.compile(loss="categorical_crossentropy", optimizer=opt,
         metrics=["accuracy"])
 
-    aug = ImageDataGenerator(
+	aug = ImageDataGenerator(
         rotation_range=5,
         zoom_range=0.15,
         width_shift_range=0.1,
@@ -192,7 +192,7 @@ def train_and_upload_model(dataset_name_zip, model_name):
         vertical_flip=False,
         fill_mode="nearest")
     
-    H = model.fit_generator(
+	H = model.fit_generator(
         aug.flow(x_train, y_train, batch_size=BS),
         validation_data=(x_test, y_test),
         steps_per_epoch=100,
@@ -200,17 +200,17 @@ def train_and_upload_model(dataset_name_zip, model_name):
         class_weight=classWeight,
         verbose=1)
 
-    model_path = os.getcwd() + '/' + model_name
+	model_path = os.getcwd() + '/' + model_name
 
-    os.mkdir(model_path)
+	os.mkdir(model_path)
 
-    model.save_weights(model_path + '/' + model_name + 'weights.h5')
-    model_json = model.to_json()
-    with open(model_path + '/' + model_name +'.json',"w") as json_file:
-        json_file.write(model_json)
-    json_file.close()
+	model.save_weights(model_path + '/' + model_name + 'weights.h5')
+	model_json = model.to_json()
+	with open(model_path + '/' + model_name +'.json',"w") as json_file:
+		json_file.write(model_json)
+	json_file.close()
     
-    uploaded = send_model_to_cloud(model_name)
+	uploaded = send_model_to_cloud(model_name)
 
-    if uploaded:
-        return print('Your model was trained and uploaded to the cloud as: {}'.format(model_name + '.zip'))
+	if uploaded:
+		return print('Your model was trained and uploaded to the cloud as: {}'.format(model_name + '.zip'))
